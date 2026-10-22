@@ -1,9 +1,11 @@
-// Sends Telugu tithi, festivals and notes to WhatsApp via CallMeBot.
+// Sends Telugu tithi, festivals and notes to WhatsApp via Green API (your own WhatsApp, linked by QR code).
 // Usage: node daily.js                  morning: today's message (+ the coming week on Sundays)
 //        node daily.js --mode=evening   evening: tomorrow's message, only if tomorrow has something
 //        node daily.js --dry-run        print the messages, send nothing
 //        node daily.js --date=2026-11-08 --dry-run   pretend it is another day (India time)
-// Recipients come from the RECIPIENTS secret: [{"name":"Me","phone":"+91...","apikey":"..."}]
+//        node daily.js --mode=groups    list your WhatsApp groups and their chat IDs
+// Settings come from the WHATSAPP secret:
+//   {"apiUrl":"https://1234.api.greenapi.com","idInstance":"1101...","apiTokenInstance":"...","chats":["1203...@g.us"]}
 const fs = require('fs');
 const path = require('path');
 global.Panchang = require('./engine.js');
@@ -119,28 +121,47 @@ function buildMessages(ymd) {
   return out;
 }
 
-async function send(r, text) {
-  const url = 'https://api.callmebot.com/whatsapp.php?' + new URLSearchParams({ phone: r.phone, text, apikey: r.apikey });
-  const res = await fetch(url);
+function settings() {
+  let w;
+  try { w = JSON.parse(process.env.WHATSAPP || '{}'); } catch { throw new Error('WHATSAPP secret is not valid JSON. Check the quotes and brackets (see README).'); }
+  for (const k of ['apiUrl', 'idInstance', 'apiTokenInstance'])
+    if (!w[k]) throw new Error(`WHATSAPP secret is missing "${k}" (see README).`);
+  return { ...w, apiUrl: String(w.apiUrl).replace(/\/+$/, '') };
+}
+const endpoint = (w, method) => `${w.apiUrl}/waInstance${w.idInstance}/${method}/${w.apiTokenInstance}`;
+
+async function send(w, chatId, message) {
+  const res = await fetch(endpoint(w, 'sendMessage'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chatId, message }),
+  });
   const body = await res.text();
-  if (!res.ok || /error|invalid|not\s+allowed/i.test(body) && !/queued|sent/i.test(body))
-    throw new Error(`CallMeBot said ${res.status}: ${body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)}`);
+  if (!res.ok || !/idMessage/.test(body)) throw new Error(`Green API said ${res.status}: ${body.slice(0, 200)}`);
+}
+
+// Prints your WhatsApp groups so you can copy the group's chat ID into the WHATSAPP secret
+async function listGroups(w) {
+  const res = await fetch(endpoint(w, 'getContacts'));
+  if (!res.ok) throw new Error(`Green API said ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const groups = (await res.json()).filter(c => String(c.id).endsWith('@g.us'));
+  if (!groups.length) console.log('No groups found. Make the WhatsApp group first, send one message in it, then try again.');
+  for (const g of groups) console.log(`${g.name || '(no name)'}  →  ${g.id}`);
 }
 
 (async () => {
+  if (mode === 'groups') return listGroups(settings());
   const ymd = todayIST();
   const messages = buildMessages(ymd);
   console.log(`=== ${mode} · ${ymd.join('-')} (${loc.name}) · ${messages.length} message(s) ===`);
   for (const m of messages) console.log(`${m}\n---`);
   if (dryRun || !messages.length) return;
-  let recipients;
-  try { recipients = JSON.parse(process.env.RECIPIENTS || '[]'); } catch { throw new Error('RECIPIENTS secret is not valid JSON.'); }
-  if (!recipients.length) throw new Error('No recipients. Add the RECIPIENTS secret in GitHub (see README).');
+  const w = settings();
+  const chats = Array.isArray(w.chats) ? w.chats : [];
+  if (!chats.length) throw new Error('WHATSAPP secret has no "chats". Add your group chat ID (see README).');
   let failed = 0;
-  for (const r of recipients) for (const text of messages) {
-    try { await send(r, text); console.log(`Sent to ${r.name || 'recipient'}`); }
-    catch (e) { failed++; console.error(`Could not send to ${r.name || 'recipient'}: ${e.message}`); }
-    await new Promise(res => setTimeout(res, 3000)); // CallMeBot asks for a gap between messages
+  for (const chatId of chats) for (const text of messages) {
+    try { await send(w, chatId, text); console.log(`Sent to chat ${chatId.slice(-10)}`); }
+    catch (e) { failed++; console.error(`Could not send to chat ${chatId.slice(-10)}: ${e.message}`); }
+    await new Promise(res => setTimeout(res, 3000)); // a short gap between messages
   }
   if (failed) process.exit(1);
 })().catch(e => { console.error(e.message); process.exit(1); });

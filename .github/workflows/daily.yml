@@ -8,10 +8,10 @@ on:
   workflow_dispatch: # lets you press "Run workflow" to test
     inputs:
       mode:
-        description: 'morning (today) or evening (tomorrow)'
+        description: 'morning (today), evening (tomorrow), or groups (list your WhatsApp group IDs)'
         default: morning
         type: choice
-        options: [morning, evening]
+        options: [morning, evening, groups]
 
 permissions:
   contents: write # only for the monthly keep-alive commit below
@@ -27,7 +27,7 @@ jobs:
       - name: Send WhatsApp message
         run: node daily.js --mode=${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.schedule == '30 13 * * *' && 'evening' || 'morning') }}
         env:
-          RECIPIENTS: ${{ secrets.RECIPIENTS }}
+          WHATSAPP: ${{ secrets.WHATSAPP }}
       # GitHub pauses scheduled jobs in repos with no commits for 60 days; a tiny monthly commit prevents that
       - name: Keep the schedule alive
         if: github.event_name == 'schedule' && github.event.schedule == '30 0 * * *'

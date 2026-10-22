@@ -4,47 +4,71 @@ This sends WhatsApp messages by the Telugu calendar:
 - **6:00 AM India time, every day:** today's Telugu date (samvatsaram, masam, tithi, vaaram), any festival with what to do, family tithis, and your own notes.
 - **7:00 PM India time, the evening before:** tomorrow's festival, family date or notes, so you can get ready. Ordinary days get no evening message.
 - **Sunday mornings:** a second message with the coming week, Monday to Sunday.
-It uses CallMeBot (free) to send and GitHub Actions (free) to run every day, even when your computer is off.
 
-## 1. Get a CallMeBot key (each person who wants messages)
+It sends from your own WhatsApp through Green API (free Developer plan, up to 3 chats) and runs on GitHub Actions
+(free) every day, even when your computer is off. Sending to a family WhatsApp group works best: everyone in the
+group gets the reminders, and the group counts as one chat.
 
-1. Go to https://www.callmebot.com/blog/free-api-whatsapp-messages/ and save the WhatsApp number shown there in your phone contacts. The number sometimes changes, so always take it from that page.
-2. From WhatsApp, send that contact this exact message: `I allow callmebot to send me messages`
-3. You get a reply with your **apikey** (a number). Keep it. Your sister does the same on her phone.
+## 1. Make the WhatsApp group
 
-## 2. Make the GitHub repository
+On your phone, make a WhatsApp group, for example **Tithi Reminders**, and add your sister and anyone else who
+should get the messages. Send one message in it ("hi") so it shows up in the list later.
+
+## 2. Link your WhatsApp to Green API
+
+1. Go to https://console.green-api.com and sign up (free).
+2. Create an instance and choose the free **Developer** plan.
+3. On the instance page you'll see a QR code. On your phone, open WhatsApp → **Settings** → **Linked devices** → **Link a device**, and scan it.
+4. On the same instance page, find these three values. You'll paste them into GitHub in step 4, so don't share them with anyone:
+   - **apiUrl** (looks like `https://1234.api.greenapi.com`)
+   - **idInstance** (a long number)
+   - **apiTokenInstance** (a long code)
+
+## 3. Make the GitHub repository
 
 1. Sign in at https://github.com (create a free account if needed).
-2. Click **+** (top right) → **New repository**. Name it `tithi-whatsapp`, choose **Private**, click **Create repository**.
-3. Click **uploading an existing file**. Drag in `daily.js`, `engine.js`, `festivals.js`, `README.md` and the `data` folder. Click **Commit changes**.
-4. Click **Add file** → **Create new file**. Type the name `.github/workflows/daily.yml` (the slashes make folders). Paste in everything from the `daily.yml` file here, then click **Commit changes**.
+2. Go to https://github.com/new. Name it `tithi-whatsapp`, choose **Private**, leave "Add a README" unticked, click **Create repository**.
+3. From this folder, run:
+   ```
+   git remote add origin https://github.com/YOUR-USERNAME/tithi-whatsapp.git
+   git push -u origin main
+   ```
+   A GitHub sign-in window opens the first time; sign in with your browser.
 
-## 3. Add the phone numbers as a secret
+## 4. Add your WhatsApp settings as a secret
 
 1. In the repo, go to **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
-2. Name: `RECIPIENTS`
-3. Value (change the numbers and keys; country code first, no spaces):
+2. Name: `WHATSAPP`
+3. Secret (put in your three values from step 2; leave `chats` empty for now):
 
 ```json
-[
-  {"name": "Me", "phone": "+919876543210", "apikey": "123456"},
-  {"name": "Chelli", "phone": "+919812345678", "apikey": "654321"}
-]
+{"apiUrl": "https://1234.api.greenapi.com", "idInstance": "1101000000", "apiTokenInstance": "paste-your-token", "chats": []}
 ```
 
-4. Click **Add secret**. The numbers and keys stay hidden and never appear in the code.
+4. Click **Add secret**. It stays hidden and never appears in the code.
 
-## 4. Test it
+## 5. Find your group's chat ID
 
-Go to **Actions** → **Daily tithi WhatsApp** → **Run workflow**. Within a minute you should get today's message.
-After that it runs by itself every morning.
+1. Go to **Actions** → **Daily tithi WhatsApp** → **Run workflow**, choose **groups**, and click the green **Run workflow** button.
+2. Open the run when it finishes, then click **send** → **Send WhatsApp message**. You'll see lines like `Tithi Reminders  →  120363...@g.us`.
+3. Copy that ID. Go back to **Settings** → **Secrets and variables** → **Actions**, click the pencil next to `WHATSAPP`, and put the ID in `chats`:
+
+```json
+{"apiUrl": "https://1234.api.greenapi.com", "idInstance": "1101000000", "apiTokenInstance": "paste-your-token", "chats": ["120363000000000000@g.us"]}
+```
+
+You can list up to 3 chats. A single person's chat ID is their number with country code and `@c.us`, for example `919876543210@c.us`.
+
+## 6. Test it
+
+**Actions** → **Daily tithi WhatsApp** → **Run workflow** → choose **morning** → **Run workflow**. Today's message
+arrives in the group within a minute. After that it runs by itself.
 
 ## Keeping family dates and notes up to date
 
 Edit anything on the Tithi Reminders page whenever you like. Every evening at about 7 PM (computer time), the
 "Sync Tithi Reminders to WhatsApp job" scheduled task in the Claude app copies your latest family dates and notes
-into this repo, before the next morning's message. It runs while the Claude app is open; if the app was closed,
-it runs the next time you open it.
+into this repo. It runs while the Claude app is open; if the app was closed, it runs the next time you open it.
 
 If you ever need to do it by hand: on the page tap **Download data for daily WhatsApp**, then in GitHub open the
 `data` folder → **Add file** → **Upload files**, drop in `tithi-data.json`, and **Commit changes**.
@@ -53,5 +77,5 @@ If you ever need to do it by hand: on the page tap **Download data for daily Wha
 
 - GitHub sometimes starts scheduled jobs up to about 30 minutes late.
 - GitHub pauses schedules in repos with no changes for 60 days. The job makes a tiny commit on the 1st of each month to prevent this.
-- CallMeBot is a free third-party service, not WhatsApp itself. If it ever stops working, the same job can be switched to Meta's official WhatsApp Cloud API.
+- Green API is a third-party service, not WhatsApp itself. Keep messages to your own family group; WhatsApp can block numbers that send spam. If your phone is offline for a long time, Green API may ask you to scan the QR code again.
 - To try a day without sending anything: `node daily.js --date=2026-11-08 --dry-run`
