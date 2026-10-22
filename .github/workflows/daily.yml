@@ -2,8 +2,16 @@ name: Daily tithi WhatsApp
 
 on:
   schedule:
-    - cron: '30 0 * * *' # 00:30 UTC = 6:00 AM India time (GitHub can run it up to ~30 min late)
+    - cron: '30 0 * * *'  # 6:00 AM India time: today's message (+ the coming week on Sundays)
+    - cron: '30 13 * * *' # 7:00 PM India time: tomorrow's message, if tomorrow has something
+    # GitHub can start scheduled runs up to ~30 minutes late
   workflow_dispatch: # lets you press "Run workflow" to test
+    inputs:
+      mode:
+        description: 'morning (today) or evening (tomorrow)'
+        default: morning
+        type: choice
+        options: [morning, evening]
 
 permissions:
   contents: write # only for the monthly keep-alive commit below
@@ -16,13 +24,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Send today's message
-        run: node daily.js
+      - name: Send WhatsApp message
+        run: node daily.js --mode=${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.schedule == '30 13 * * *' && 'evening' || 'morning') }}
         env:
           RECIPIENTS: ${{ secrets.RECIPIENTS }}
       # GitHub pauses scheduled jobs in repos with no commits for 60 days; a tiny monthly commit prevents that
       - name: Keep the schedule alive
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' && github.event.schedule == '30 0 * * *'
         run: |
           if [ "$(TZ=Asia/Kolkata date +%d)" = "01" ]; then
             date -u > .keepalive

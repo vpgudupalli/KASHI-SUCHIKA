@@ -1,7 +1,8 @@
-// Sends today's Telugu tithi, festivals and notes to WhatsApp via CallMeBot.
-// Usage: node daily.js            send for today (India time)
-//        node daily.js --dry-run  print the message, send nothing
-//        node daily.js --date=2026-11-08 --dry-run   try another day
+// Sends Telugu tithi, festivals and notes to WhatsApp via CallMeBot.
+// Usage: node daily.js                  morning: today's message (+ the coming week on Sundays)
+//        node daily.js --mode=evening   evening: tomorrow's message, only if tomorrow has something
+//        node daily.js --dry-run        print the messages, send nothing
+//        node daily.js --date=2026-11-08 --dry-run   pretend it is another day (India time)
 // Recipients come from the RECIPIENTS secret: [{"name":"Me","phone":"+91...","apikey":"..."}]
 const fs = require('fs');
 const path = require('path');
@@ -30,6 +31,7 @@ const VAARAM = ['ఆదివారం', 'సోమవారం', 'మంగళ�
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const dateArg = (args.find(a => a.startsWith('--date=')) || '').slice(7);
+const mode = (args.find(a => a.startsWith('--mode=')) || '--mode=morning').slice(7);
 
 // Family dates and notes exported from the Tithi Reminders page
 const dataFile = path.join(__dirname, 'data', 'tithi-data.json');
@@ -66,20 +68,55 @@ function itemsOn(ymd) {
   return { info, items };
 }
 
-function buildMessage(ymd) {
-  const { info, items } = itemsOn(ymd);
-  const sv = P.samvatsara(ymd, info.masa);
-  const lines = [`🌅 శ్రీ ${sv.te} నామ సంవత్సరం`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(ymd)]}`];
-  if (!items.length) lines.push('', 'ఈరోజు ప్రత్యేకం లేదు · No festival today.');
+function pushItems(lines, items) {
   for (const it of items) {
     lines.push('', `*${it.title}*`);
     for (const x of it.todo) lines.push(`• ${x}`);
     for (const x of it.mine) lines.push(`⭐ ${x}`);
   }
-  const tomorrow = P.addDays(ymd, 1);
-  const next = F.between(tomorrow, tomorrow, loc).filter(o => o.f.major);
-  if (next.length) lines.push('', `రేపు · Tomorrow: ${next.map(o => o.f.te).join(', ')}`);
+}
+
+// Morning: today in full
+function morningMessage(ymd) {
+  const { info, items } = itemsOn(ymd);
+  const sv = P.samvatsara(ymd, info.masa);
+  const lines = [`🌅 ఈరోజు · Today`, `శ్రీ ${sv.te} నామ సంవత్సరం`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(ymd)]}`];
+  if (!items.length) lines.push('', 'ఈరోజు ప్రత్యేకం లేదు · No festival today.');
+  pushItems(lines, items);
   return lines.join('\n');
+}
+
+// Evening: tomorrow in full, so there is time to prepare; null when tomorrow is an ordinary day
+function eveningMessage(ymd) {
+  const tomorrow = P.addDays(ymd, 1);
+  const { info, items } = itemsOn(tomorrow);
+  if (!items.length) return null;
+  const lines = [`🌙 రేపు · Tomorrow`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(tomorrow)]}`,
+    'ఈరోజే సిద్ధం చేసుకోండి · Get ready today'];
+  pushItems(lines, items);
+  return lines.join('\n');
+}
+
+// Sunday: the coming week, Monday to Sunday, one line per special day
+function weekMessage(ymd) {
+  const lines = ['📅 ఈ వారం · This week'];
+  let any = false;
+  for (let i = 1; i <= 7; i++) {
+    const d = P.addDays(ymd, i), { info, items } = itemsOn(d);
+    lines.push('', `*${VAARAM[wd(d)]}* · ${tithiLabel(info.masa, info.tithi, info.adhika)}`);
+    if (!items.length) { lines.push('  –'); continue; }
+    any = true;
+    for (const it of items) lines.push(`• ${it.title}${it.mine.length ? ` ⭐${it.mine.length}` : ''}`);
+  }
+  if (!any) lines.push('', 'No festivals this week.');
+  return lines.join('\n');
+}
+
+function buildMessages(ymd) {
+  if (mode === 'evening') return [eveningMessage(ymd)].filter(Boolean);
+  const out = [morningMessage(ymd)];
+  if (wd(ymd) === 0) out.push(weekMessage(ymd));
+  return out;
 }
 
 async function send(r, text) {
@@ -92,14 +129,15 @@ async function send(r, text) {
 
 (async () => {
   const ymd = todayIST();
-  const text = buildMessage(ymd);
-  console.log(`--- ${ymd.join('-')} (${loc.name}) ---\n${text}\n`);
-  if (dryRun) return;
+  const messages = buildMessages(ymd);
+  console.log(`=== ${mode} · ${ymd.join('-')} (${loc.name}) · ${messages.length} message(s) ===`);
+  for (const m of messages) console.log(`${m}\n---`);
+  if (dryRun || !messages.length) return;
   let recipients;
   try { recipients = JSON.parse(process.env.RECIPIENTS || '[]'); } catch { throw new Error('RECIPIENTS secret is not valid JSON.'); }
   if (!recipients.length) throw new Error('No recipients. Add the RECIPIENTS secret in GitHub (see README).');
   let failed = 0;
-  for (const r of recipients) {
+  for (const r of recipients) for (const text of messages) {
     try { await send(r, text); console.log(`Sent to ${r.name || 'recipient'}`); }
     catch (e) { failed++; console.error(`Could not send to ${r.name || 'recipient'}: ${e.message}`); }
     await new Promise(res => setTimeout(res, 3000)); // CallMeBot asks for a gap between messages

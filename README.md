@@ -1,7 +1,9 @@
 # Daily Tithi WhatsApp
 
-Every morning at about 6:00 AM India time, this sends a WhatsApp message with today's Telugu date
-(samvatsaram, masam, tithi, vaaram), any festival with what to do, family tithis, and your own notes.
+This sends WhatsApp messages by the Telugu calendar:
+- **6:00 AM India time, every day:** today's Telugu date (samvatsaram, masam, tithi, vaaram), any festival with what to do, family tithis, and your own notes.
+- **7:00 PM India time, the evening before:** tomorrow's festival, family date or notes, so you can get ready. Ordinary days get no evening message.
+- **Sunday mornings:** a second message with the coming week, Monday to Sunday.
 It uses CallMeBot (free) to send and GitHub Actions (free) to run every day, even when your computer is off.
 
 ## 1. Get a CallMeBot key (each person who wants messages)
