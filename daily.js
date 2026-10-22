@@ -139,12 +139,25 @@ async function send(w, chatId, message) {
 }
 
 // Prints your WhatsApp groups so you can copy the group's chat ID into the WHATSAPP secret
+// Looks in contacts, chats and the last day's messages, since a freshly linked phone may not list groups everywhere yet
 async function listGroups(w) {
-  const res = await fetch(endpoint(w, 'getContacts'));
-  if (!res.ok) throw new Error(`Green API said ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const groups = (await res.json()).filter(c => String(c.id).endsWith('@g.us'));
-  if (!groups.length) console.log('No groups found. Make the WhatsApp group first, send one message in it, then try again.');
-  for (const g of groups) console.log(`${g.name || '(no name)'}  →  ${g.id}`);
+  const groups = new Map();
+  for (const method of ['getContacts', 'getChats', 'lastIncomingMessages?minutes=1440', 'lastOutgoingMessages?minutes=1440']) {
+    const [name, query] = method.split('?');
+    try {
+      const res = await fetch(endpoint(w, name) + (query ? '?' + query : ''));
+      if (!res.ok) { console.log(`(${name}: ${res.status})`); continue; }
+      const list = await res.json();
+      for (const c of Array.isArray(list) ? list : []) {
+        const id = String(c.id || c.chatId || '');
+        if (!id.endsWith('@g.us')) continue;
+        const label = c.name || c.chatName || c.contactName || '';
+        if (!groups.has(id) || (label && !groups.get(id))) groups.set(id, label);
+      }
+    } catch (e) { console.log(`(${name}: ${e.message})`); }
+  }
+  if (!groups.size) console.log('No groups found. Send a message in the WhatsApp group from your phone, wait a minute, then try again.');
+  for (const [id, label] of groups) console.log(`${label || '(name not shown)'}  →  ${id}`);
 }
 
 (async () => {
