@@ -39,10 +39,13 @@ After that it runs by itself every morning.
 
 ## Keeping family dates and notes up to date
 
-The job can't read the Tithi Reminders page directly. When you add or change family dates or notes there:
+Edit anything on the Tithi Reminders page whenever you like. Every evening at about 7 PM (computer time), the
+"Sync Tithi Reminders to WhatsApp job" scheduled task in the Claude app copies your latest family dates and notes
+into this repo, before the next morning's message. It runs while the Claude app is open; if the app was closed,
+it runs the next time you open it.
 
-1. On the page, tap **Download data for daily WhatsApp**. This saves `tithi-data.json`.
-2. In GitHub, open the `data` folder → **Add file** → **Upload files**, drop in the new `tithi-data.json`, and **Commit changes**.
+If you ever need to do it by hand: on the page tap **Download data for daily WhatsApp**, then in GitHub open the
+`data` folder → **Add file** → **Upload files**, drop in `tithi-data.json`, and **Commit changes**.
 
 ## Good to know
 
