@@ -51,13 +51,14 @@ should get the messages. Send one message in it ("hi") so it shows up in the lis
 
 1. Go to **Actions** → **Daily tithi WhatsApp** → **Run workflow**, choose **groups**, and click the green **Run workflow** button.
 2. Open the run when it finishes, then click **send** → **Send WhatsApp message**. You'll see lines like `Tithi Reminders  →  120363...@g.us`.
-3. Copy that ID. Go back to **Settings** → **Secrets and variables** → **Actions**, click the pencil next to `WHATSAPP`, and put the ID in `chats`:
+3. Copy that ID and put it in the file `data/chats.json` in the repo (click the file, then the pencil to edit), in quotes inside the brackets:
 
 ```json
-{"apiUrl": "https://1234.api.greenapi.com", "idInstance": "1101000000", "apiTokenInstance": "paste-your-token", "chats": ["120363000000000000@g.us"]}
+["120363000000000000@g.us"]
 ```
 
 You can list up to 3 chats. A single person's chat ID is their number with country code and `@c.us`, for example `919876543210@c.us`.
+(If you prefer, you can put the list in the secret's `"chats"` instead; the secret wins when it has any.)
 
 ## 6. Test it
 

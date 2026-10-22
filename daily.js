@@ -155,8 +155,11 @@ async function listGroups(w) {
   for (const m of messages) console.log(`${m}\n---`);
   if (dryRun || !messages.length) return;
   const w = settings();
-  const chats = Array.isArray(w.chats) ? w.chats : [];
-  if (!chats.length) throw new Error('WHATSAPP secret has no "chats". Add your group chat ID (see README).');
+  // Chats come from the secret, or else from data/chats.json (group IDs are not passwords)
+  const chatsFile = path.join(__dirname, 'data', 'chats.json');
+  const fileChats = fs.existsSync(chatsFile) ? JSON.parse(fs.readFileSync(chatsFile, 'utf8')) : [];
+  const chats = (Array.isArray(w.chats) && w.chats.length ? w.chats : fileChats).filter(c => /@(g|c)\.us$/.test(c));
+  if (!chats.length) throw new Error('No chat to send to. Add your group chat ID to data/chats.json (see README).');
   let failed = 0;
   for (const chatId of chats) for (const text of messages) {
     try { await send(w, chatId, text); console.log(`Sent to chat ${chatId.slice(-10)}`); }
