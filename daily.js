@@ -141,6 +141,10 @@ async function send(w, chatId, message) {
 // Prints your WhatsApp groups so you can copy the group's chat ID into the WHATSAPP secret
 // Looks in contacts, chats and the last day's messages, since a freshly linked phone may not list groups everywhere yet
 async function listGroups(w) {
+  try {
+    const st = await (await fetch(endpoint(w, 'getStateInstance'))).json();
+    console.log(`WhatsApp link status: ${st.stateInstance}${st.stateInstance === 'authorized' ? ' (linked OK)' : ' — open console.green-api.com and scan the QR code from WhatsApp → Linked devices'}`);
+  } catch (e) { console.log(`(getStateInstance: ${e.message})`); }
   const groups = new Map();
   for (const method of ['getContacts', 'getChats', 'lastIncomingMessages?minutes=1440', 'lastOutgoingMessages?minutes=1440']) {
     const [name, query] = method.split('?');
@@ -148,6 +152,7 @@ async function listGroups(w) {
       const res = await fetch(endpoint(w, name) + (query ? '?' + query : ''));
       if (!res.ok) { console.log(`(${name}: ${res.status})`); continue; }
       const list = await res.json();
+      console.log(`${name}: ${Array.isArray(list) ? list.length + ' item(s)' : 'unexpected reply'}`);
       for (const c of Array.isArray(list) ? list : []) {
         const id = String(c.id || c.chatId || '');
         if (!id.endsWith('@g.us')) continue;
