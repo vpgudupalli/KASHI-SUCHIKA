@@ -1,5 +1,11 @@
 {
   "city": "hyd",
   "family": [],
-  "notes": []
+  "notes": [
+    {
+      "id": "nmvixney90dsc",
+      "target": "fest:mukkoti",
+      "text": "Rama Japam"
+    }
+  ]
 }
