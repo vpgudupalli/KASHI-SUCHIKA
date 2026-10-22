@@ -103,10 +103,18 @@ details.more summary { cursor: pointer; font-size: .85rem; color: var(--muted); 
 .note p { margin: 0 0 8px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 10px; font-size: .9rem; max-width: calc(100% - 48px); }
 .err { color: var(--warn); font-size: .85rem; }
+.banner { border: 2px solid var(--warn); background: var(--paper); color: var(--ink); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; font-size: .92rem; }
+.banner b { color: var(--warn); }
+.banner.info { border-color: var(--accent); }
+.banner.info b { color: var(--ink); }
 @media (max-width: 440px) { .day > summary, .day > .plain { grid-template-columns: 22px 78px 1fr; gap: 8px; padding: 10px 12px; } .dbody { padding-left: 14px; } }
 </style>
 
 <div class="wrap">
+  <div class="banner" id="storeBanner" role="status" hidden>
+    <div id="storeBannerText"></div>
+    <div class="actions"><button class="primary" type="button" id="migrateBtn" hidden></button></div>
+  </div>
   <header>
     <h1>తిథి గుర్తులు · Tithi Reminders</h1>
     <p class="lede">The Telugu calendar for every day: today's tithi, festivals with what to do on each, your family's birthdays and anniversaries by tithi, and your own notes on any day. Tap a day to add yours.</p>
@@ -900,7 +908,46 @@ function renderNotes() {
   }).join('') : '<p class="note">No notes yet. Add one above, or tap any day in the next 30 days.</p>';
 }
 
-function renderAll() { renderToday(); renderDays(); renderFests(); renderCards(); renderNotes(); updatePreview(); }
+// Where saves go: shared with the page, or only this device. Make the device-only case impossible to miss.
+let storeChecked = false, canWrite = null;
+const deviceOnly = () => {
+  if (store !== 'db') return { ev: [], nt: [] };
+  const evIds = new Set(events.map(e => e.id)), ntIds = new Set(notes.map(n => n.id));
+  return { ev: loadLocal().filter(e => e && e.id && !evIds.has(e.id)), nt: loadNotes().filter(n => n && n.id && !ntIds.has(n.id)) };
+};
+function renderStore() {
+  const b = $('storeBanner'), txt = $('storeBannerText'), btn = $('migrateBtn');
+  btn.hidden = true; b.classList.remove('info');
+  if (store === 'local' && storeChecked) {
+    b.hidden = false;
+    txt.innerHTML = '<b>Your changes are saved only on this device.</b> Others you share the page with won’t see them, and they won’t go to WhatsApp. Open this page while signed in to Claude, then anything you added here can be copied to the shared page.';
+  } else if (store === 'db' && canWrite === false) {
+    b.hidden = false;
+    txt.innerHTML = '<b>You can view this page but not change it.</b> Ask the person who shared it to give you Contributor access in the Share menu.';
+  } else if (store === 'db') {
+    const { ev, nt } = deviceOnly(), n = ev.length + nt.length;
+    b.hidden = !n;
+    if (n) {
+      b.classList.add('info');
+      txt.innerHTML = `<b>${n} ${n === 1 ? 'entry was' : 'entries were'} saved only on this device earlier.</b> Copy ${n === 1 ? 'it' : 'them'} to the shared page so everyone sees ${n === 1 ? 'it' : 'them'} and ${n === 1 ? 'it goes' : 'they go'} to WhatsApp.`;
+      btn.textContent = `Copy ${n} to the shared page`; btn.hidden = false;
+    }
+  } else b.hidden = true;
+}
+$('migrateBtn').onclick = async () => {
+  const { ev, nt } = deviceOnly(), btn = $('migrateBtn');
+  btn.disabled = true; btn.textContent = 'Copying…';
+  let done = 0;
+  try {
+    for (const e of ev) { const { id, name, occasion, masa, tithi, createdAt } = e; await db.collection('events').doc(id).set({ name, occasion, masa, tithi, createdAt: createdAt || new Date().toISOString() }); done++; }
+    for (const n of nt) { const { id, target, text, createdAt } = n; await db.collection('notes').doc(id).set({ target, text, createdAt: createdAt || new Date().toISOString() }); done++; }
+    try { localStorage.removeItem(LS); localStorage.removeItem(NLS); } catch {}
+    toast(`Copied ${done} to the shared page`);
+  } catch (err) { toast(`Copied ${done}, then stopped: ${err.message || err.code}`); }
+  btn.disabled = false; renderStore();
+};
+
+function renderAll() { renderToday(); renderDays(); renderFests(); renderCards(); renderNotes(); updatePreview(); renderStore(); }
 
 $('cards').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -998,13 +1045,19 @@ renderAll();
 
 (async () => {
   const d = window.claude?.use ? await claude.use('db') : null;
-  if (!d) return;
+  storeChecked = true;
+  if (!d) { renderStore(); return; }
   db = d;
+  (async () => {
+    const u = window.claude?.use ? await claude.use('user') : null;
+    canWrite = u ? await u.can('data.write') : null;
+    renderStore();
+  })();
   db.collection('events').onSnapshot(snap => {
     store = 'db';
     events = snap.docs.map(s => ({ id: s.id, ...s.data() })).filter(e => Number.isInteger(e.masa) && Number.isInteger(e.tithi));
     renderAll();
-  }, () => { store = 'local'; events = loadLocal(); renderAll(); });
+  }, () => { store = 'local'; storeChecked = true; events = loadLocal(); renderAll(); });
   db.collection('notes').onSnapshot(snap => {
     notes = snap.docs.map(s => ({ id: s.id, ...s.data() })).filter(n => typeof n.target === 'string' && typeof n.text === 'string');
     renderAll();
