@@ -1,0 +1,34 @@
+name: Daily tithi WhatsApp
+
+on:
+  schedule:
+    - cron: '30 0 * * *' # 00:30 UTC = 6:00 AM India time (GitHub can run it up to ~30 min late)
+  workflow_dispatch: # lets you press "Run workflow" to test
+
+permissions:
+  contents: write # only for the monthly keep-alive commit below
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Send today's message
+        run: node daily.js
+        env:
+          RECIPIENTS: ${{ secrets.RECIPIENTS }}
+      # GitHub pauses scheduled jobs in repos with no commits for 60 days; a tiny monthly commit prevents that
+      - name: Keep the schedule alive
+        if: github.event_name == 'schedule'
+        run: |
+          if [ "$(TZ=Asia/Kolkata date +%d)" = "01" ]; then
+            date -u > .keepalive
+            git config user.name "tithi-bot"
+            git config user.email "tithi-bot@users.noreply.github.com"
+            git add .keepalive
+            git commit -m "Keep daily schedule active"
+            git push
+          fi
