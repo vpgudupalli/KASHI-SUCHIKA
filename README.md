@@ -65,14 +65,23 @@ You can list up to 3 chats. A single person's chat ID is their number with count
 **Actions** → **Daily tithi WhatsApp** → **Run workflow** → choose **morning** → **Run workflow**. Today's message
 arrives in the group within a minute. After that it runs by itself.
 
-## Keeping family dates and notes up to date
+## Adding family dates and notes (shared Google Sheet)
 
-Edit anything on the Tithi Reminders page whenever you like. Every evening at about 7 PM (computer time), the
-"Sync Tithi Reminders to WhatsApp job" scheduled task in the Claude app copies your latest family dates and notes
-into this repo. It runs while the Claude app is open; if the app was closed, it runs the next time you open it.
+You and your family add entries in one shared Google Sheet, **Tithi Family Notebook**. Before every message,
+the job reads the sheet directly, so new rows go out automatically on their Telugu dates, every year.
+No computer or Claude app is needed.
 
-If you ever need to do it by hand: on the page tap **Download data for daily WhatsApp**, then in GitHub open the
-`data` folder → **Add file** → **Upload files**, drop in `tithi-data.json`, and **Commit changes**.
+- **Family** tab: Name, Occasion, Masam, Paksham, Tithi, and optional extra things to do.
+- **Notes** tab: pick what it comes back on: a **Festival**, a **Telugu date every year** (masam + paksham + tithi),
+  or a **Tithi every month** (paksham + tithi); then type what to do.
+- Rows missing a dropdown value are skipped, and the run log says which row.
+
+Setup (once): upload `Tithi Family Notebook.xlsx` to Google Drive, open it with Google Sheets
+(File → Save as Google Sheets), share it with family as **Editor**, set **General access** to
+**Anyone with the link → Viewer**, and put its ID in `data/sheet.json` as `{"sheetId": "..."}`.
+The ID is the long part of the sheet's address between `/d/` and `/edit`.
+
+If the sheet can't be read, the job still sends the day's festivals and uses `data/tithi-data.json` for entries.
 
 ## Good to know
 

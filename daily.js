@@ -35,12 +35,71 @@ const dryRun = args.includes('--dry-run');
 const dateArg = (args.find(a => a.startsWith('--date=')) || '').slice(7);
 const mode = (args.find(a => a.startsWith('--mode=')) || '--mode=morning').slice(7);
 
-// Family dates and notes exported from the Tithi Reminders page
+// Family dates and notes: from the shared Google Sheet (data/sheet.json) when set up,
+// otherwise from data/tithi-data.json (exported from the Tithi Reminders page)
 const dataFile = path.join(__dirname, 'data', 'tithi-data.json');
 const data = fs.existsSync(dataFile) ? JSON.parse(fs.readFileSync(dataFile, 'utf8')) : {};
-const family = Array.isArray(data.family) ? data.family : [];
-const notes = Array.isArray(data.notes) ? data.notes : [];
+let family = Array.isArray(data.family) ? data.family : [];
+let notes = Array.isArray(data.notes) ? data.notes : [];
 const loc = CITIES[data.city] || CITIES.hyd;
+
+const sheetFile = path.join(__dirname, 'data', 'sheet.json');
+const sheetId = fs.existsSync(sheetFile) ? JSON.parse(fs.readFileSync(sheetFile, 'utf8')).sheetId : null;
+const SHEET_FESTS = [...F.LIST, ...F.RECURRING, { id: 'kartikasomavaram', te: 'కార్తీక సోమవారం', en: 'Kartika Somavaram' }];
+
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.map(r => r.map(s => s.trim()));
+}
+async function sheetTab(name) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(name)}`;
+  const res = await fetch(url);
+  const body = await res.text();
+  if (!res.ok || /^\s*<!DOCTYPE|<html/i.test(body)) throw new Error(`could not read the "${name}" tab (${res.status}). Is the sheet shared as "Anyone with the link"?`);
+  return parseCsv(body).slice(1).filter(r => r.some(Boolean));
+}
+// Dropdown labels → numbers. Labels look like "Ashvayuja · ఆశ్వయుజము", "Shukla · శుక్ల", "10. Dashami · దశమి".
+const first = s => String(s || '').split('·')[0].trim().toLowerCase();
+const masaOf = s => P.MASAS.findIndex(m => m.toLowerCase() === first(s));
+function tithiOf(paksha, tithi) {
+  const n = parseInt(tithi, 10);
+  if (!(n >= 1 && n <= 15)) return -1;
+  return /^(bahula|krishna)/i.test(String(paksha).trim()) ? n + 15 : n;
+}
+const festOf = s => (SHEET_FESTS.find(f => f.en.toLowerCase() === first(s)) || {}).id;
+
+async function loadSheet() {
+  const fam = [], nts = [], skipped = [];
+  (await sheetTab('Family')).forEach((r, i) => {
+    const [name, occ, masa, paksha, tithi, extra] = r;
+    const m = masaOf(masa), t = tithiOf(paksha, tithi);
+    if (!name || m < 0 || t < 0) return skipped.push(`Family row ${i + 2}`);
+    const id = 'sheet-fam-' + (i + 2);
+    fam.push({ id, name, occasion: first(occ) ? String(occ).split('·')[0].trim() : 'Other', masa: m, tithi: t });
+    if (extra) nts.push({ id: id + '-x', target: 'fam:' + id, text: extra });
+  });
+  (await sheetTab('Notes')).forEach((r, i) => {
+    const [kind, fest, masa, paksha, tithi, text] = r;
+    if (!text) return;
+    const k = first(kind), m = masaOf(masa), t = tithiOf(paksha, tithi), f = festOf(fest);
+    const target = k.startsWith('festival') && f ? 'fest:' + f
+      : k.startsWith('telugu date') && m >= 0 && t > 0 ? `year:${m}:${t}`
+      : k.startsWith('tithi every month') && t > 0 ? 'month:' + t : null;
+    if (!target) return skipped.push(`Notes row ${i + 2}`);
+    nts.push({ id: 'sheet-note-' + (i + 2), target, text });
+  });
+  if (skipped.length) console.log(`Skipped (missing masam/paksham/tithi/festival): ${skipped.join(', ')}`);
+  return { fam, nts };
+}
 
 const wd = ([y, m, d]) => new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const same = (a, b) => a.join('-') === b.join('-');
@@ -167,6 +226,10 @@ async function listGroups(w) {
 
 (async () => {
   if (mode === 'groups') return listGroups(settings());
+  if (sheetId) {
+    try { const s = await loadSheet(); family = s.fam; notes = s.nts; console.log(`Google Sheet: ${family.length} family date(s), ${notes.length} note(s)`); }
+    catch (e) { console.log(`WARNING: Google Sheet not read, using the saved data file instead: ${e.message}`); }
+  }
   const ymd = todayIST();
   const messages = buildMessages(ymd);
   console.log(`=== ${mode} · ${ymd.join('-')} (${loc.name}) · ${messages.length} message(s) ===`);
