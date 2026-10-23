@@ -125,6 +125,23 @@ async function loadSheet() {
         : k.startsWith('tithi every month') && t > 0 ? 'month:' + t : null, r['What to do']);
     });
 
+  // Entries saved by the Tithi Reminders Google app (tabs "App family" / "App notes": id, json, …)
+  for (const [tab, kindName] of [['App family', 'family'], ['App notes', 'notes']]) {
+    let rows = [];
+    try { rows = await sheetTab(tab); } catch (e) { console.log(`(${tab}: ${e.message})`); }
+    if (!hasHead(rows, 'json')) continue;
+    for (const r of rows) {
+      let d; try { d = JSON.parse(r['json']); } catch { skipped.push(`${tab} row ${r._row}`); continue; }
+      const id = String(r['id'] || '');
+      if (kindName === 'family') {
+        if (d && typeof d.name === 'string' && Number.isInteger(d.masa) && d.masa >= 0 && d.masa < 12 && Number.isInteger(d.tithi) && d.tithi >= 1 && d.tithi <= 30)
+          fam.push({ id, name: d.name, occasion: String(d.occasion || 'Other'), masa: d.masa, tithi: d.tithi });
+        else skipped.push(`${tab} row ${r._row}`);
+      } else if (d && typeof d.text === 'string' && /^(fest|fam|year|month):/.test(d.target || '')) nts.push({ id, target: d.target, text: d.text });
+      else skipped.push(`${tab} row ${r._row}`);
+    }
+  }
+
   // Answers from the "Add a Tithi Reminder" Google Form
   let formRows = [];
   try { formRows = await sheetTab('Form entries'); } catch (e) { console.log(`(Form entries: ${e.message})`); }
