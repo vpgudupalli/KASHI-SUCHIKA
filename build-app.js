@@ -75,6 +75,12 @@ rep("Open this page while signed in to Claude, then anything you added here can 
 rep("Saved with this page, so family you share it with see the same list.",
   "Saved in the shared Tithi Family Notebook, so your family sees the same list, and it goes to WhatsApp.");
 
+// Google's web-app frame rewrites inline scripts and treats "//" inside strings as a comment start,
+// which cuts lines like 'https://wa.me/…'. Write the slashes as "\/" inside scripts (same string in JS).
+h = h.replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => '<script>' + js.replace(/(['"`][^'"`\n]*?)https?:\/\//g, (x, pre) => x.replace('://', ':\\/\\/')) + '</script>');
+// Google's frame lacks the usual [hidden] rule, so buttons marked hidden would still show
+h = h.replace('<style>', '<style>\n[hidden] { display: none !important; }');
+
 const code = `// Tithi Reminders web app. Built by build-app.js from the Tithi Reminders page; edit there, not here.
 // Saves family dates and notes in the Tithi Family Notebook sheet; the daily WhatsApp job reads them.
 const SHEET_ID = '${SHEET_ID}';
