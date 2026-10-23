@@ -2,19 +2,19 @@ name: Daily tithi WhatsApp
 
 on:
   schedule:
-    # Every evening, tomorrow's full message (Sunday evening also brings the coming week).
+    # Every morning, TOMORROW's full message (Sunday morning also brings the coming week).
     # GitHub often starts scheduled runs late or skips them, so there are three tries at quiet
-    # minutes; daily.js sends only once per evening.
-    - cron: '37 13 * * *' # 7:07 PM India time
-    - cron: '7 14 * * *'  # 7:37 PM, backup
-    - cron: '37 14 * * *' # 8:07 PM, backup
+    # minutes; daily.js sends only once per day.
+    - cron: '37 1 * * *' # 7:07 AM India time
+    - cron: '7 2 * * *'  # 7:37 AM, backup
+    - cron: '37 2 * * *' # 8:07 AM, backup
   workflow_dispatch: # lets you press "Run workflow" to test
     inputs:
       mode:
-        description: 'evening (tomorrow), morning (today), or groups (list your WhatsApp group IDs)'
-        default: evening
+        description: 'tomorrow (the daily message), today, or groups (list your WhatsApp group IDs)'
+        default: tomorrow
         type: choice
-        options: [evening, morning, groups]
+        options: [tomorrow, today, groups]
 
 permissions:
   contents: write # only for the monthly keep-alive commit below
@@ -28,12 +28,12 @@ jobs:
         with:
           node-version: 20
       - name: Send WhatsApp message
-        run: node daily.js --mode=${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'evening' }}
+        run: node daily.js --mode=${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'tomorrow' }}
         env:
           WHATSAPP: ${{ secrets.WHATSAPP }}
       # GitHub pauses scheduled jobs in repos with no commits for 60 days; a tiny monthly commit prevents that
       - name: Keep the schedule alive
-        if: github.event_name == 'schedule' && github.event.schedule == '37 13 * * *'
+        if: github.event_name == 'schedule' && github.event.schedule == '37 1 * * *'
         run: |
           if [ "$(TZ=Asia/Kolkata date +%d)" = "01" ]; then
             date -u > .keepalive

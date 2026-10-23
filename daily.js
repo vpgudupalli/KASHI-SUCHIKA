@@ -1,6 +1,6 @@
 // Sends Telugu tithi, festivals and notes to WhatsApp via Green API (your own WhatsApp, linked by QR code).
-// Usage: node daily.js --mode=evening   evening: tomorrow's full message (+ the coming week on Sundays) — the scheduled one
-//        node daily.js                  morning: today's message (manual use only)
+// Usage: node daily.js                  tomorrow's full message (+ the coming week on Sundays) — the scheduled one, sent at 7 AM India time
+//        node daily.js --mode=today     today's message (manual use only)
 //        node daily.js --dry-run        print the messages, send nothing
 //        node daily.js --date=2026-11-08 --dry-run   pretend it is another day (India time)
 //        node daily.js --mode=groups    list your WhatsApp groups and their chat IDs
@@ -33,7 +33,9 @@ const VAARAM = ['ఆదివారం', 'సోమవారం', 'మంగళ�
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const dateArg = (args.find(a => a.startsWith('--date=')) || '').slice(7);
-const mode = (args.find(a => a.startsWith('--mode=')) || '--mode=morning').slice(7);
+// tomorrow (= evening): the scheduled daily message about the next day; today (= morning): today's message
+const modeArg = (args.find(a => a.startsWith('--mode=')) || '--mode=tomorrow').slice(7);
+const mode = { tomorrow: 'evening', today: 'morning' }[modeArg] || modeArg;
 
 // Family dates and notes: from the shared Google Sheet (data/sheet.json) when set up,
 // otherwise from data/tithi-data.json (exported from the Tithi Reminders page)
@@ -152,7 +154,7 @@ function eveningMessage(ymd) {
   const tomorrow = P.addDays(ymd, 1);
   const { info, items } = itemsOn(tomorrow);
   const sv = P.samvatsara(tomorrow, info.masa);
-  const lines = [`🌙 రేపు · Tomorrow`, `శ్రీ ${sv.te} నామ సంవత్సరం`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(tomorrow)]}`];
+  const lines = [`🗓️ రేపు · Tomorrow`, `శ్రీ ${sv.te} నామ సంవత్సరం`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(tomorrow)]}`];
   if (!items.length) lines.push('', 'రేపు ప్రత్యేకం లేదు · No festival tomorrow.');
   else lines.push('ఈరోజే సిద్ధం చేసుకోండి · Get ready today');
   pushItems(lines, items);
