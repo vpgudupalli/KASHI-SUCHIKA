@@ -1,5 +1,5 @@
 // Sends Telugu tithi, festivals and notes to WhatsApp via Green API (your own WhatsApp, linked by QR code).
-// Usage: node daily.js                  tomorrow's full message (+ the coming week on Sundays) — the scheduled one, sent at 7 AM India time
+// Usage: node daily.js                  tomorrow's full message (+ the coming week on Sundays) — the scheduled one, sent at 8 AM India time
 //        node daily.js --mode=today     today's message (manual use only)
 //        node daily.js --dry-run        print the messages, send nothing
 //        node daily.js --date=2026-11-08 --dry-run   pretend it is another day (India time)

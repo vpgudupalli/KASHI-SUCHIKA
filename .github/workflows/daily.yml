@@ -5,9 +5,9 @@ on:
     # Every morning, TOMORROW's full message (Sunday morning also brings the coming week).
     # GitHub often starts scheduled runs late or skips them, so there are three tries at quiet
     # minutes; daily.js sends only once per day.
-    - cron: '37 1 * * *' # 7:07 AM India time
-    - cron: '7 2 * * *'  # 7:37 AM, backup
-    - cron: '37 2 * * *' # 8:07 AM, backup
+    - cron: '32 2 * * *' # 8:02 AM India time
+    - cron: '2 3 * * *'  # 8:32 AM, backup
+    - cron: '32 3 * * *' # 9:02 AM, backup
   workflow_dispatch: # lets you press "Run workflow" to test
     inputs:
       mode:
@@ -33,7 +33,7 @@ jobs:
           WHATSAPP: ${{ secrets.WHATSAPP }}
       # GitHub pauses scheduled jobs in repos with no commits for 60 days; a tiny monthly commit prevents that
       - name: Keep the schedule alive
-        if: github.event_name == 'schedule' && github.event.schedule == '37 1 * * *'
+        if: github.event_name == 'schedule' && github.event.schedule == '32 2 * * *'
         run: |
           if [ "$(TZ=Asia/Kolkata date +%d)" = "01" ]; then
             date -u > .keepalive
