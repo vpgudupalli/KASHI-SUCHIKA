@@ -178,8 +178,22 @@ async function listGroups(w) {
   const fileChats = fs.existsSync(chatsFile) ? JSON.parse(fs.readFileSync(chatsFile, 'utf8')) : [];
   const chats = (Array.isArray(w.chats) && w.chats.length ? w.chats : fileChats).filter(c => /@(g|c)\.us$/.test(c));
   if (!chats.length) throw new Error('No chat to send to. Add your group chat ID to data/chats.json (see README).');
+  // Several scheduled tries run each morning/evening; skip any message already sent today (India date)
+  const istDay = ms => new Date(ms + 5.5 * 3600000).toISOString().slice(0, 10);
+  let recent = [];
+  if (!args.includes('--force')) {
+    try {
+      const res = await fetch(endpoint(w, 'lastOutgoingMessages') + '?minutes=1440');
+      if (res.ok) recent = await res.json();
+    } catch (e) { console.log(`(could not check earlier messages: ${e.message})`); }
+  }
+  const today = istDay(Date.now());
+  const sentToday = (chatId, text) => (Array.isArray(recent) ? recent : []).some(m =>
+    m.chatId === chatId && m.sendByApi !== false && istDay((m.timestamp || 0) * 1000) === today &&
+    String(m.textMessage || '').split('\n')[0] === text.split('\n')[0]);
   let failed = 0;
   for (const chatId of chats) for (const text of messages) {
+    if (sentToday(chatId, text)) { console.log(`Already sent today to chat ${chatId.slice(-10)}: ${text.split('\n')[0]}`); continue; }
     try { await send(w, chatId, text); console.log(`Sent to chat ${chatId.slice(-10)}`); }
     catch (e) { failed++; console.error(`Could not send to chat ${chatId.slice(-10)}: ${e.message}`); }
     await new Promise(res => setTimeout(res, 3000)); // a short gap between messages
