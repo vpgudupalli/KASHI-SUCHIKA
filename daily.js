@@ -35,7 +35,8 @@ const dryRun = args.includes('--dry-run');
 const dateArg = (args.find(a => a.startsWith('--date=')) || '').slice(7);
 // tomorrow (= evening): the scheduled daily message about the next day; today (= morning): today's message
 const modeArg = (args.find(a => a.startsWith('--mode=')) || '--mode=tomorrow').slice(7);
-const mode = { tomorrow: 'evening', today: 'morning' }[modeArg] || modeArg;
+const mode = { tomorrow: 'evening', today: 'morning', test: 'morning' }[modeArg] || modeArg;
+if (modeArg === 'test') args.push('--force'); // test: send today's message even if it already went out
 
 // Family dates and notes: from the shared Google Sheet (data/sheet.json) when set up,
 // otherwise from data/tithi-data.json (exported from the Tithi Reminders page)

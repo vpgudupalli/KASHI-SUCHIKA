@@ -11,10 +11,10 @@ on:
   workflow_dispatch: # lets you press "Run workflow" to test
     inputs:
       mode:
-        description: 'tomorrow (the daily message), today, or groups (list your WhatsApp group IDs)'
+        description: 'tomorrow (the daily message), today, test (send today now, even if already sent), or groups (list WhatsApp group IDs)'
         default: tomorrow
         type: choice
-        options: [tomorrow, today, groups]
+        options: [tomorrow, today, test, groups]
 
 permissions:
   contents: write # only for the monthly keep-alive commit below
