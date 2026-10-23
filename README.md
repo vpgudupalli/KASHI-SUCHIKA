@@ -1,8 +1,8 @@
 # Daily Tithi WhatsApp
 
 This sends WhatsApp messages by the Telugu calendar:
-- **Every morning at about 8 AM India time:** the full message for **tomorrow**: Telugu date (samvatsaram, masam, tithi, vaaram), any festival with what to do, family tithis and your notes. So Saturday's message arrives on Friday morning.
-- **Sunday mornings:** a second message with the coming week, Monday to Sunday.
+- **Every morning at about 4:30 AM India time:** the full message for **tomorrow**: Telugu date (samvatsaram, masam, tithi, vaaram), any festival with what to do, family tithis and your notes. So Saturday's message arrives on Friday morning.
+- **Sunday mornings (4:30 AM):** a second message with the coming week, Monday to Sunday.
 
 It sends from your own WhatsApp through Green API (free Developer plan, up to 3 chats) and runs on GitHub Actions
 (free) every day, even when your computer is off. Sending to a family WhatsApp group works best: everyone in the
