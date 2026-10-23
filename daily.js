@@ -67,8 +67,13 @@ async function sheetTab(name) {
   const res = await fetch(url);
   const body = await res.text();
   if (!res.ok || /^\s*<!DOCTYPE|<html/i.test(body)) throw new Error(`could not read the "${name}" tab (${res.status}). Is the sheet shared as "Anyone with the link"?`);
-  return parseCsv(body).slice(1).filter(r => r.some(Boolean));
+  const rows = parseCsv(body);
+  // Rows as {header: value}. Google returns the first tab when a name doesn't exist, so callers check headers.
+  const head = rows[0] || [];
+  return rows.slice(1).filter(r => r.some(Boolean)).map(r => Object.fromEntries(head.map((h, i) => [h, r[i] || ''])))
+    .map((o, i) => Object.assign(o, { _row: i + 2, _head: head }));
 }
+const hasHead = (rows, h) => rows.length && rows[0]._head.includes(h);
 // Dropdown labels → numbers. Labels look like "Ashvayuja · ఆశ్వయుజము", "Shukla · శుక్ల", "10. Dashami · దశమి".
 const first = s => String(s || '').split('·')[0].trim().toLowerCase();
 const masaOf = s => P.MASAS.findIndex(m => m.toLowerCase() === first(s));
@@ -81,24 +86,48 @@ const festOf = s => (SHEET_FESTS.find(f => f.en.toLowerCase() === first(s)) || {
 
 async function loadSheet() {
   const fam = [], nts = [], skipped = [];
-  (await sheetTab('Family')).forEach((r, i) => {
-    const [name, occ, masa, paksha, tithi, extra] = r;
+  const addFam = (src, row, name, occ, masa, paksha, tithi, extra) => {
     const m = masaOf(masa), t = tithiOf(paksha, tithi);
-    if (!name || m < 0 || t < 0) return skipped.push(`Family row ${i + 2}`);
-    const id = 'sheet-fam-' + (i + 2);
+    if (!name || m < 0 || t < 0) return skipped.push(`${src} row ${row}`);
+    const id = `sheet-${src}-${row}`.replace(/\s+/g, '');
     fam.push({ id, name, occasion: first(occ) ? String(occ).split('·')[0].trim() : 'Other', masa: m, tithi: t });
     if (extra) nts.push({ id: id + '-x', target: 'fam:' + id, text: extra });
-  });
-  (await sheetTab('Notes')).forEach((r, i) => {
-    const [kind, fest, masa, paksha, tithi, text] = r;
+  };
+  const addNote = (src, row, target, text) => {
     if (!text) return;
-    const k = first(kind), m = masaOf(masa), t = tithiOf(paksha, tithi), f = festOf(fest);
-    const target = k.startsWith('festival') && f ? 'fest:' + f
-      : k.startsWith('telugu date') && m >= 0 && t > 0 ? `year:${m}:${t}`
-      : k.startsWith('tithi every month') && t > 0 ? 'month:' + t : null;
-    if (!target) return skipped.push(`Notes row ${i + 2}`);
-    nts.push({ id: 'sheet-note-' + (i + 2), target, text });
-  });
+    if (!target) return skipped.push(`${src} row ${row}`);
+    nts.push({ id: `sheet-${src}-${row}`.replace(/\s+/g, ''), target, text });
+  };
+
+  // Rows typed straight into the sheet
+  const famRows = await sheetTab('Family');
+  if (hasHead(famRows, 'Name') && hasHead(famRows, 'Occasion'))
+    famRows.forEach(r => addFam('Family', r._row, r['Name'], r['Occasion'], r['Masam'], r['Paksham'], r['Tithi'], r['Extra things to do (optional)']));
+  const noteRows = await sheetTab('Notes');
+  if (hasHead(noteRows, 'Comes back on'))
+    noteRows.forEach(r => {
+      const k = first(r['Comes back on']), m = masaOf(r['Masam (if Telugu date)']), t = tithiOf(r['Paksham'], r['Tithi']), f = festOf(r['Festival (if festival)']);
+      addNote('Notes', r._row, k.startsWith('festival') && f ? 'fest:' + f
+        : k.startsWith('telugu date') && m >= 0 && t > 0 ? `year:${m}:${t}`
+        : k.startsWith('tithi every month') && t > 0 ? 'month:' + t : null, r['What to do']);
+    });
+
+  // Answers from the "Add a Tithi Reminder" Google Form
+  let formRows = [];
+  try { formRows = await sheetTab('Form entries'); } catch (e) { console.log(`(Form entries: ${e.message})`); }
+  if (hasHead(formRows, 'What would you like to add?'))
+    formRows.forEach(r => {
+      const k = String(r['What would you like to add?']).toLowerCase(), row = r._row;
+      if (k.includes('family')) return addFam('Form', row, r["Person's name"], r['Occasion'], r['Family · Masam'], r['Family · Paksham'], r['Family · Tithi'], r['Family · Extra things to do (optional)']);
+      if (k.includes('festival')) { const f = festOf(r['Festival']); return addNote('Form', row, f && 'fest:' + f, r['Festival · What to do']); }
+      if (k.includes('telugu date')) {
+        const m = masaOf(r['Date · Masam']), t = tithiOf(r['Date · Paksham'], r['Date · Tithi']);
+        return addNote('Form', row, m >= 0 && t > 0 && `year:${m}:${t}`, r['Date · What to do']);
+      }
+      if (k.includes('every month')) { const t = tithiOf(r['Monthly · Paksham'], r['Monthly · Tithi']); return addNote('Form', row, t > 0 && 'month:' + t, r['Monthly · What to do']); }
+      skipped.push(`Form row ${row}`);
+    });
+
   if (skipped.length) console.log(`Skipped (missing masam/paksham/tithi/festival): ${skipped.join(', ')}`);
   return { fam, nts };
 }

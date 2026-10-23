@@ -64,23 +64,29 @@ You can list up to 3 chats. A single person's chat ID is their number with count
 **Actions** → **Daily tithi WhatsApp** → **Run workflow** → choose **morning** → **Run workflow**. Today's message
 arrives in the group within a minute. After that it runs by itself.
 
-## Adding family dates and notes (shared Google Sheet)
+## Adding family dates and notes
 
-You and your family add entries in one shared Google Sheet, **Tithi Family Notebook**. Before every message,
-the job reads the sheet directly, so new rows go out automatically on their Telugu dates, every year.
-No computer or Claude app is needed.
+**The easy way: the "Add a Tithi Reminder" form.** Open the form link (it's in the sheet's **Start here** tab;
+pin it in the WhatsApp group too), pick what you're adding, fill in the dropdowns, and press Submit. Answers land
+in the sheet's **Form entries** tab, and the job reads them before every message, so they go out automatically
+on their Telugu dates, every year. No computer or Claude app is needed. To change or remove an entry, edit or
+delete its row in **Form entries**.
 
-- **Family** tab: Name, Occasion, Masam, Paksham, Tithi, and optional extra things to do.
-- **Notes** tab: pick what it comes back on: a **Festival**, a **Telugu date every year** (masam + paksham + tithi),
-  or a **Tithi every month** (paksham + tithi); then type what to do.
-- Rows missing a dropdown value are skipped, and the run log says which row.
+You can also type rows straight into the sheet's **Family** and **Notes** tabs.
 
-Setup (once): upload `Tithi Family Notebook.xlsx` to Google Drive, open it with Google Sheets
-(File → Save as Google Sheets), share it with family as **Editor**, set **General access** to
-**Anyone with the link → Viewer**, and put its ID in `data/sheet.json` as `{"sheetId": "..."}`.
-The ID is the long part of the sheet's address between `/d/` and `/edit`.
+### Setting up the sheet and form (once)
 
-If the sheet can't be read, the job still sends the day's festivals and uses `data/tithi-data.json` for entries.
+1. Upload `Tithi Family Notebook.xlsx` to Google Drive, open it with Google Sheets, then **File → Save as Google Sheets**.
+2. In that Google Sheet: **Extensions → Apps Script**. Delete what's there, paste everything from `setup-form.gs`,
+   click **Save** (💾), then **Run**. Google asks for permission: **Review permissions** → your account →
+   **Advanced** → **Go to (unsafe)** → **Allow**. (It says "unsafe" only because you wrote the script yourself.)
+3. A **Start here** tab appears with the form link.
+4. **Share** the sheet with family as **Editor**, and set **General access** to **Anyone with the link → Viewer**.
+5. Put the sheet's ID in `data/sheet.json` as `{"sheetId": "..."}`. The ID is the long part of the sheet's
+   address between `/d/` and `/edit`.
+
+Rows missing a dropdown value are skipped, and the run log says which row. If the sheet can't be read, the job
+still sends the day's festivals and uses `data/tithi-data.json` for entries.
 
 ## Good to know
 
