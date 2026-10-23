@@ -2,20 +2,19 @@ name: Daily tithi WhatsApp
 
 on:
   schedule:
-    # GitHub often starts scheduled runs late (sometimes over an hour) or skips them, so each message
-    # has several tries at quiet minutes; daily.js sends only once per day per message.
-    - cron: '7 0 * * *'   # 5:37 AM India time: today's message (+ the coming week on Sundays)
-    - cron: '37 0 * * *'  # 6:07 AM, backup
-    - cron: '7 1 * * *'   # 6:37 AM, backup
-    - cron: '37 13 * * *' # 7:07 PM India time: tomorrow's message, if tomorrow has something
+    # Every evening, tomorrow's full message (Sunday evening also brings the coming week).
+    # GitHub often starts scheduled runs late or skips them, so there are three tries at quiet
+    # minutes; daily.js sends only once per evening.
+    - cron: '37 13 * * *' # 7:07 PM India time
     - cron: '7 14 * * *'  # 7:37 PM, backup
+    - cron: '37 14 * * *' # 8:07 PM, backup
   workflow_dispatch: # lets you press "Run workflow" to test
     inputs:
       mode:
-        description: 'morning (today), evening (tomorrow), or groups (list your WhatsApp group IDs)'
-        default: morning
+        description: 'evening (tomorrow), morning (today), or groups (list your WhatsApp group IDs)'
+        default: evening
         type: choice
-        options: [morning, evening, groups]
+        options: [evening, morning, groups]
 
 permissions:
   contents: write # only for the monthly keep-alive commit below
@@ -29,12 +28,12 @@ jobs:
         with:
           node-version: 20
       - name: Send WhatsApp message
-        run: node daily.js --mode=${{ github.event_name == 'workflow_dispatch' && inputs.mode || ((github.event.schedule == '37 13 * * *' || github.event.schedule == '7 14 * * *') && 'evening' || 'morning') }}
+        run: node daily.js --mode=${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'evening' }}
         env:
           WHATSAPP: ${{ secrets.WHATSAPP }}
       # GitHub pauses scheduled jobs in repos with no commits for 60 days; a tiny monthly commit prevents that
       - name: Keep the schedule alive
-        if: github.event_name == 'schedule' && github.event.schedule == '7 0 * * *'
+        if: github.event_name == 'schedule' && github.event.schedule == '37 13 * * *'
         run: |
           if [ "$(TZ=Asia/Kolkata date +%d)" = "01" ]; then
             date -u > .keepalive

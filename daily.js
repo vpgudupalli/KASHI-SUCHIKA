@@ -1,6 +1,6 @@
 // Sends Telugu tithi, festivals and notes to WhatsApp via Green API (your own WhatsApp, linked by QR code).
-// Usage: node daily.js                  morning: today's message (+ the coming week on Sundays)
-//        node daily.js --mode=evening   evening: tomorrow's message, only if tomorrow has something
+// Usage: node daily.js --mode=evening   evening: tomorrow's full message (+ the coming week on Sundays) — the scheduled one
+//        node daily.js                  morning: today's message (manual use only)
 //        node daily.js --dry-run        print the messages, send nothing
 //        node daily.js --date=2026-11-08 --dry-run   pretend it is another day (India time)
 //        node daily.js --mode=groups    list your WhatsApp groups and their chat IDs
@@ -147,13 +147,14 @@ function morningMessage(ymd) {
   return lines.join('\n');
 }
 
-// Evening: tomorrow in full, so there is time to prepare; null when tomorrow is an ordinary day
+// Evening: tomorrow in full, every day, so there is time to prepare
 function eveningMessage(ymd) {
   const tomorrow = P.addDays(ymd, 1);
   const { info, items } = itemsOn(tomorrow);
-  if (!items.length) return null;
-  const lines = [`🌙 రేపు · Tomorrow`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(tomorrow)]}`,
-    'ఈరోజే సిద్ధం చేసుకోండి · Get ready today'];
+  const sv = P.samvatsara(tomorrow, info.masa);
+  const lines = [`🌙 రేపు · Tomorrow`, `శ్రీ ${sv.te} నామ సంవత్సరం`, `${tithiLabel(info.masa, info.tithi, info.adhika)} · ${VAARAM[wd(tomorrow)]}`];
+  if (!items.length) lines.push('', 'రేపు ప్రత్యేకం లేదు · No festival tomorrow.');
+  else lines.push('ఈరోజే సిద్ధం చేసుకోండి · Get ready today');
   pushItems(lines, items);
   return lines.join('\n');
 }
@@ -174,7 +175,7 @@ function weekMessage(ymd) {
 }
 
 function buildMessages(ymd) {
-  if (mode === 'evening') return [eveningMessage(ymd)].filter(Boolean);
+  if (mode === 'evening') return [eveningMessage(ymd), ...(wd(ymd) === 0 ? [weekMessage(ymd)] : [])]; // Sunday evening: + Mon–Sun
   const out = [morningMessage(ymd)];
   if (wd(ymd) === 0) out.push(weekMessage(ymd));
   return out;
