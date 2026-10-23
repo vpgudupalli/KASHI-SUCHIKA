@@ -83,11 +83,24 @@ function tithiOf(paksha, tithi) {
   return /^(bahula|krishna)/i.test(String(paksha).trim()) ? n + 15 : n;
 }
 const festOf = s => (SHEET_FESTS.find(f => f.en.toLowerCase() === first(s)) || {}).id;
+// A date picked on the form's calendar → its Telugu masam and tithi (at sunrise). Accepts 2026-10-23,
+// and 10/23/2026 or 23/10/2026 (read as day/month when the first number is over 12).
+function teluguOfDate(s) {
+  let y, m, d, x;
+  if ((x = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) [y, m, d] = [+x[1], +x[2], +x[3]];
+  else if ((x = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s))) [y, m, d] = +x[1] > 12 ? [+x[3], +x[2], +x[1]] : [+x[3], +x[1], +x[2]];
+  else return null;
+  if (!(y > 1800 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+  const info = P.dayInfo(y, m, d, loc); // in an adhika month, yearly repeats use the regular month of the same name
+  return { masa: info.masa, tithi: info.tithi };
+}
 
 async function loadSheet() {
   const fam = [], nts = [], skipped = [];
-  const addFam = (src, row, name, occ, masa, paksha, tithi, extra) => {
-    const m = masaOf(masa), t = tithiOf(paksha, tithi);
+  const addFam = (src, row, name, occ, masa, paksha, tithi, extra, date) => {
+    let m = masaOf(masa), t = tithiOf(paksha, tithi);
+    const fromDate = (m < 0 || t < 0) && date ? teluguOfDate(date) : null;
+    if (fromDate) ({ masa: m, tithi: t } = fromDate);
     if (!name || m < 0 || t < 0) return skipped.push(`${src} row ${row}`);
     const id = `sheet-${src}-${row}`.replace(/\s+/g, '');
     fam.push({ id, name, occasion: first(occ) ? String(occ).split('·')[0].trim() : 'Other', masa: m, tithi: t });
@@ -118,10 +131,12 @@ async function loadSheet() {
   if (hasHead(formRows, 'What would you like to add?'))
     formRows.forEach(r => {
       const k = String(r['What would you like to add?']).toLowerCase(), row = r._row;
-      if (k.includes('family')) return addFam('Form', row, r["Person's name"], r['Occasion'], r['Family · Masam'], r['Family · Paksham'], r['Family · Tithi'], r['Family · Extra things to do (optional)']);
+      if (k.includes('family')) return addFam('Form', row, r["Person's name"], r['Occasion'], r['Family · Masam'], r['Family · Paksham'], r['Family · Tithi'], r['Family · Extra things to do (optional)'], r['Family · Date it happened']);
       if (k.includes('festival')) { const f = festOf(r['Festival']); return addNote('Form', row, f && 'fest:' + f, r['Festival · What to do']); }
       if (k.includes('telugu date')) {
-        const m = masaOf(r['Date · Masam']), t = tithiOf(r['Date · Paksham'], r['Date · Tithi']);
+        let m = masaOf(r['Date · Masam']), t = tithiOf(r['Date · Paksham'], r['Date · Tithi']);
+        const fromDate = (m < 0 || t < 0) && r['Date · Pick the day'] ? teluguOfDate(r['Date · Pick the day']) : null;
+        if (fromDate) ({ masa: m, tithi: t } = fromDate);
         return addNote('Form', row, m >= 0 && t > 0 && `year:${m}:${t}`, r['Date · What to do']);
       }
       if (k.includes('every month')) { const t = tithiOf(r['Monthly · Paksham'], r['Monthly · Tithi']); return addNote('Form', row, t > 0 && 'month:' + t, r['Monthly · What to do']); }

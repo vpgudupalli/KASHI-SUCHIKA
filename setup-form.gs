@@ -21,10 +21,12 @@ function createReminderForm() {
   const famPage = form.addPageBreakItem().setTitle('Family birthday / anniversary / aabdikam');
   form.addTextItem().setTitle("Person's name").setRequired(true);
   form.addListItem().setTitle('Occasion').setChoiceValues(OCCASIONS).setRequired(true);
-  form.addListItem().setTitle('Family · Masam').setChoiceValues(MASAS).setRequired(true);
-  form.addListItem().setTitle('Family · Paksham').setChoiceValues(PAKSHAS).setRequired(true);
-  form.addListItem().setTitle('Family · Tithi').setChoiceValues(TITHIS).setRequired(true)
-    .setHelpText('15 means Pournami in Shukla paksham and Amavasya in Bahula paksham.');
+  form.addDateItem().setTitle('Family · Date it happened')
+    .setHelpText('Pick the birth / wedding / passing date on the calendar. The Telugu tithi is worked out for you, and the reminder comes every year on that tithi. If you already know the tithi instead, leave this empty and choose below.');
+  form.addListItem().setTitle('Family · Masam').setChoiceValues(MASAS).setHelpText('Only if you did not pick a date above.');
+  form.addListItem().setTitle('Family · Paksham').setChoiceValues(PAKSHAS).setHelpText('Only if you did not pick a date above.');
+  form.addListItem().setTitle('Family · Tithi').setChoiceValues(TITHIS)
+    .setHelpText('Only if you did not pick a date above. 15 means Pournami in Shukla paksham and Amavasya in Bahula paksham.');
   form.addParagraphTextItem().setTitle('Family · Extra things to do (optional)');
 
   const festPage = form.addPageBreakItem().setTitle('Note for a festival').setGoToPage(FormApp.PageNavigationType.SUBMIT);
@@ -32,9 +34,11 @@ function createReminderForm() {
   form.addParagraphTextItem().setTitle('Festival · What to do').setRequired(true);
 
   const datePage = form.addPageBreakItem().setTitle('Note for a Telugu date (every year)').setGoToPage(FormApp.PageNavigationType.SUBMIT);
-  form.addListItem().setTitle('Date · Masam').setChoiceValues(MASAS).setRequired(true);
-  form.addListItem().setTitle('Date · Paksham').setChoiceValues(PAKSHAS).setRequired(true);
-  form.addListItem().setTitle('Date · Tithi').setChoiceValues(TITHIS).setRequired(true);
+  form.addDateItem().setTitle('Date · Pick the day')
+    .setHelpText('Pick any day on the calendar. The note comes back every year on the Telugu tithi of that day. Or leave empty and choose masam, paksham and tithi below.');
+  form.addListItem().setTitle('Date · Masam').setChoiceValues(MASAS).setHelpText('Only if you did not pick a day above.');
+  form.addListItem().setTitle('Date · Paksham').setChoiceValues(PAKSHAS).setHelpText('Only if you did not pick a day above.');
+  form.addListItem().setTitle('Date · Tithi').setChoiceValues(TITHIS).setHelpText('Only if you did not pick a day above.');
   form.addParagraphTextItem().setTitle('Date · What to do').setRequired(true);
 
   const monthPage = form.addPageBreakItem().setTitle('Note for a tithi (every month)').setGoToPage(FormApp.PageNavigationType.SUBMIT);
@@ -54,7 +58,12 @@ function createReminderForm() {
   SpreadsheetApp.flush();
   const formUrl = form.getEditUrl().replace(/\/edit.*$/, '');
   const tab = ss.getSheets().find(s => { const u = s.getFormUrl(); return u && u.replace(/\/(edit|viewform).*$/, '') === formUrl; });
-  if (tab) tab.setName('Form entries');
+  if (tab) {
+    tab.setName('Form entries');
+    // Show picked dates as 2026-10-23 so the WhatsApp job reads them the same way in every country
+    const head = tab.getRange(1, 1, 1, tab.getLastColumn()).getValues()[0];
+    head.forEach((h, i) => { if (/Date it happened|Pick the day/.test(h)) tab.getRange(1, i + 1, tab.getMaxRows()).offset(1, 0, tab.getMaxRows() - 1).setNumberFormat('yyyy-mm-dd'); });
+  }
 
   // A "Start here" tab with the link to share
   const start = ss.getSheetByName('Start here') || ss.insertSheet('Start here', 0);
