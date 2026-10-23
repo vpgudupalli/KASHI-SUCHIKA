@@ -274,7 +274,15 @@ async function listGroups(w) {
 (async () => {
   if (mode === 'groups') return listGroups(settings());
   if (sheetId) {
-    try { const s = await loadSheet(); family = s.fam; notes = s.nts; console.log(`Google Sheet: ${family.length} family date(s), ${notes.length} note(s)`); }
+    try {
+      // The sheet plus anything already saved from the Tithi Reminders page, without repeats
+      const s = await loadSheet();
+      console.log(`Google Sheet: ${s.fam.length} family date(s), ${s.nts.length} note(s)`);
+      const famKey = f => `${f.name}|${f.masa}|${f.tithi}`.toLowerCase(), noteKey = n => `${n.target}|${n.text}`.toLowerCase();
+      const seenF = new Set(s.fam.map(famKey)), seenN = new Set(s.nts.map(noteKey));
+      family = [...s.fam, ...family.filter(f => !seenF.has(famKey(f)))];
+      notes = [...s.nts, ...notes.filter(n => !seenN.has(noteKey(n)))];
+    }
     catch (e) { console.log(`WARNING: Google Sheet not read, using the saved data file instead: ${e.message}`); }
   }
   const ymd = todayIST();
