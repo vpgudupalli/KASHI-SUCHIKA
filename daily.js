@@ -309,6 +309,12 @@ async function listGroups(w) {
   for (const m of messages) console.log(`${m}\n---`);
   if (dryRun || !messages.length) return;
   const w = settings();
+  // Green API accepts messages even while WhatsApp is unlinked and just queues them, so check the link first
+  // and fail the run (GitHub then emails the owner) instead of silently queueing.
+  let state = 'unknown';
+  try { state = (await (await fetch(endpoint(w, 'getStateInstance'))).json()).stateInstance; } catch (e) { state = 'unreachable: ' + e.message; }
+  if (state !== 'authorized')
+    throw new Error(`WhatsApp is not linked to Green API (status: ${state}). Scan the QR code again at console.green-api.com (WhatsApp → Linked devices → Link a device). Nothing was sent.`);
   // Chats come from the secret, or else from data/chats.json (group IDs are not passwords)
   const chatsFile = path.join(__dirname, 'data', 'chats.json');
   const fileChats = fs.existsSync(chatsFile) ? JSON.parse(fs.readFileSync(chatsFile, 'utf8')) : [];
